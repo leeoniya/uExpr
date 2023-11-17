@@ -1,0 +1,12 @@
+{
+  "name": "uexpr",
+  "version": "0.0.1",
+  "description": "",
+  "main": "src/uExpr.mjs",
+  "module": "true",
+  "scripts": {
+    "test": "node ./test/test.mjs"
+  },
+  "author": "",
+  "license": "MIT"
+}
