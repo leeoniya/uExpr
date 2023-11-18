@@ -1,4 +1,4 @@
-## [&&] μExpr
+## μExpr
 
 A conditional expression compiler _(MIT Licensed)_
 
