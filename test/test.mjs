@@ -82,11 +82,19 @@ test("compileExpr (single)", async t => {
   });
 
   await t.test("regexp", t => {
-    assert.deepEqual(compileExpr(['/',   '.value', '\\d+']), { stmts: ['let $0 = new RegExp("\\\\d+", "");'], expr: `$0.test($.value)` });
-    assert.deepEqual(compileExpr(['re',  '.value', '\\d+']), { stmts: ['let $0 = new RegExp("\\\\d+", "");'], expr: `$0.test($.value)` });
+    assert.deepEqual(compileExpr(['/',       '.value', '\\d+']), { stmts: ['let $0 = new RegExp("\\\\d+", "");'], expr: `$0.test($.value)` });
+    assert.deepEqual(compileExpr(['regexp',  '.value', '\\d+']), { stmts: ['let $0 = new RegExp("\\\\d+", "");'], expr: `$0.test($.value)` });
 
-    assert.deepEqual(compileExpr(['/i',  '.value', '\\d+']), { stmts: ['let $0 = new RegExp("\\\\d+", "i");'], expr: `$0.test($.value)` });
-    assert.deepEqual(compileExpr(['rei', '.value', '\\d+']), { stmts: ['let $0 = new RegExp("\\\\d+", "i");'], expr: `$0.test($.value)` });
+    assert.deepEqual(compileExpr(['/i',      '.value', '\\d+']), { stmts: ['let $0 = new RegExp("\\\\d+", "i");'], expr: `$0.test($.value)` });
+    assert.deepEqual(compileExpr(['regexpi', '.value', '\\d+']), { stmts: ['let $0 = new RegExp("\\\\d+", "i");'], expr: `$0.test($.value)` });
+  });
+
+  await t.test("optional chaining", t => {
+    assert.deepEqual(compileExpr(['==', '.geo[1].foo.?bar.?[4]', '123'], { chain: true }), { stmts: [], expr: `$.?geo.?[1].?foo.?bar.?[4] == "123"` });
+  });
+
+  await t.test("injection guards", t => {
+    assert.deepEqual(compileExpr(['==', '.hello(); alert(window); " \'', '\' "global({bad}); alert("hi");']), { stmts: [], expr: `$.helloalertwindow == "' \\"global({bad}); alert(\\"hi\\");"` });
   });
 });
 

@@ -99,8 +99,8 @@ export function compileExpr(node, opts = OPTS, stmts = []) {
       expr = `${path}.includes(${cleanRHS(rhs)})`;
       break;
 
-    case 're':
-    case 'rei':
+    case 'regexp':
+    case 'regexpi':
     case '/':
     case '/i':
       let flags = op.at(-1) == 'i' ? 'i' : '';
