@@ -35,15 +35,26 @@ console.timeEnd('jsonLogic');
 
 console.log(out.length);
 
-let matcher = compileMatcher(
+rules = (
   ['&&',
     ['<', '.temp', 110],
     ['==', '.pie.filling', 'apple'],
   ]
-)
+);
 
-console.time('uExpr');
+let matcher = compileMatcher(rules);
+
+console.time('uExpr (matcher)');
 out = data.filter(matcher);
-console.timeEnd('uExpr');
+console.timeEnd('uExpr (matcher)');
+
+console.log(out.length);
+
+
+let filter = compileFilter(rules);
+
+console.time('uExpr (filter)');
+out = filter(data);
+console.timeEnd('uExpr (filter)');
 
 console.log(out.length);
