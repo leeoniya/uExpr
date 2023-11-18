@@ -1,7 +1,29 @@
-const clean = v => JSON.stringify(v);
-const glue = (ctx, path) => path == '$' || path == '$i' ? path : ctx + path.replace(/[^\w.?\[\]]/ig, '');
+const cleanRHS = v => JSON.stringify(v);
+const cleanLHS = (path, chain = false) => {
+  if (path == null || path == '' || path == '$' || path == '$i')
+    return path;
 
-export function compileExpr(node, stmts = [], ctx = '$') {
+  let cleanPath = '';
+
+  // guard against access outside of scope
+  if (path[0] == '.' || path[0] == '[') {
+    // remove baddies
+    cleanPath = path.replace(/[^\w.?\[\]-]/ig, '');
+
+    // add optional chaining
+    if (chain) {
+      cleanPath = cleanPath
+        .replace(/\.\??/ig, '.?')
+        .replace(/(?:\.\?)?\[/ig, '.?[');
+    }
+  }
+
+  return '$' + cleanPath;
+}
+
+let OPTS = { chain: false };
+
+export function compileExpr(node, opts = OPTS, stmts = []) {
   let op = node[0];
   let lhs = node[1];
   let rhs = node[2];
@@ -12,12 +34,12 @@ export function compileExpr(node, stmts = [], ctx = '$') {
 
   op = negate ? op.slice(1) : op;
 
-  let path = op != '&&' && op != '||' ? glue(ctx, lhs) : '';
+  let path = op != '&&' && op != '||' ? cleanLHS(lhs, opts.chain) : '';
 
   switch (op) {
     case '&&':
     case '||':
-      let exprs = node.slice(1).map(node2 => compileExpr(node2, stmts, ctx));
+      let exprs = node.slice(1).map(node2 => compileExpr(node2, opts, stmts));
       expr = exprs.length > 1 ? `(${exprs.map(o => o.expr).join(` ${op} `)})` : exprs[0].expr;
       break;
 
@@ -34,18 +56,18 @@ export function compileExpr(node, stmts = [], ctx = '$') {
     case '<=':
     case '<':
     case '>':
-      expr = `${path} ${op} ${clean(rhs)}`;
+      expr = `${path} ${op} ${cleanRHS(rhs)}`;
       break;
 
     case 'some':
     case 'every':
-      expr = `${path}.${op}(($, $i) => ${compileExpr(rhs, stmts).expr})`;
+      expr = `${path}.${op}(($, $i) => ${compileExpr(rhs, opts, stmts).expr})`;
       break;
 
     case ',':
     case 'in':
       expr = `$${stmts.length}.has(${path})`;
-      stmts.push(`let $${stmts.length} = new Set(${clean(rhs)});`);
+      stmts.push(`let $${stmts.length} = new Set(${cleanRHS(rhs)});`);
       break;
 
     case '-':
@@ -59,22 +81,22 @@ export function compileExpr(node, stmts = [], ctx = '$') {
       let [l, r] = op;
       let lop = l == '[' || l == '-' ? '>=' : '>';
       let rop = r == ']' || r == null ? '<=' : '<';
-      expr = `${path} ${lop} ${clean(min)} && ${path} ${rop} ${clean(max)}`;
+      expr = `${path} ${lop} ${cleanRHS(min)} && ${path} ${rop} ${cleanRHS(max)}`;
       break;
 
     case 'startsWith':
     case '^':
-      expr = `${path}.startsWith(${clean(rhs)})`;
+      expr = `${path}.startsWith(${cleanRHS(rhs)})`;
       break;
 
     case 'endsWith':
     case '$':
-      expr = `${path}.endsWith(${clean(rhs)})`;
+      expr = `${path}.endsWith(${cleanRHS(rhs)})`;
       break;
 
     case 'includes':
     case '*':
-      expr = `${path}.includes(${clean(rhs)})`;
+      expr = `${path}.includes(${cleanRHS(rhs)})`;
       break;
 
     case 're':
@@ -83,7 +105,7 @@ export function compileExpr(node, stmts = [], ctx = '$') {
     case '/i':
       let flags = op.at(-1) == 'i' ? 'i' : '';
       expr = `$${stmts.length}.test(${path})`;
-      stmts.push(`let $${stmts.length} = new RegExp(${clean(rhs)}, "${flags}");`);
+      stmts.push(`let $${stmts.length} = new RegExp(${cleanRHS(rhs)}, "${flags}");`);
       break;
 
     case 'isInteger':
@@ -105,8 +127,8 @@ export function compileExpr(node, stmts = [], ctx = '$') {
   };
 }
 
-export function compileMatcher(nodes) {
-  let { expr, stmts } = compileExpr(nodes);
+export function compileMatcher(nodes, opts = OPTS) {
+  let { expr, stmts } = compileExpr(nodes, opts);
 
   return new Function(`
     ${stmts.join('\n')};
@@ -123,8 +145,8 @@ case 'last':  // backwards early break
   rhs = node[2];
 case 'only':  // early return nothing if count > 1
 */
-export function compileFilter(nodes, mode = 'all') {
-  let { expr, stmts } = compileExpr(nodes);
+export function compileFilter(nodes, opts = OPTS) {
+  let { expr, stmts } = compileExpr(nodes, opts);
 
   return new Function(`
     ${stmts.join('\n')}
