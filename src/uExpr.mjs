@@ -45,7 +45,7 @@ export function compileExpr(node, stmts = [], ctx = '$') {
     case ',':
     case 'in':
       expr = `$${stmts.length}.has(${path})`;
-      stmts.push(`let $${stmts.length} = new Set(${clean(rhs)})`);
+      stmts.push(`let $${stmts.length} = new Set(${clean(rhs)});`);
       break;
 
     case '-':
@@ -83,7 +83,7 @@ export function compileExpr(node, stmts = [], ctx = '$') {
     case '/i':
       let flags = op.at(-1) == 'i' ? 'i' : '';
       expr = `$${stmts.length}.test(${path})`;
-      stmts.push(`let $${stmts.length} = new RegExp(${clean(rhs)}, "${flags}")`);
+      stmts.push(`let $${stmts.length} = new RegExp(${clean(rhs)}, "${flags}");`);
       break;
 
     case 'isInteger':
@@ -105,8 +105,13 @@ export function compileExpr(node, stmts = [], ctx = '$') {
   };
 }
 
-export function compileMatcher({expr, stmts}) {
-  return new Function('', `${stmts.join(';\n')}; return ($, $i = 0) => ${expr};`)();
+export function compileMatcher(nodes) {
+  let { expr, stmts } = compileExpr(nodes);
+
+  return new Function(`
+    ${stmts.join('\n')};
+    return ($, $i = 0) => ${expr};
+  `)();
 }
 
 /*
@@ -118,13 +123,26 @@ case 'last':  // backwards early break
   rhs = node[2];
 case 'only':  // early return nothing if count > 1
 */
-export function compileFilter(o, mode = 'all') {
+export function compileFilter(nodes, mode = 'all') {
+  let { expr, stmts } = compileExpr(nodes);
 
+  return new Function(`
+    ${stmts.join('\n')}
+    return arr => {
+      let out = [];
+      for (let $i = 0; $i < arr.length; $i++) {
+        let $ = arr[$i];
+        ${expr} && out.push($);
+      }
+      return out;
+    };
+  `)();
 }
 
 // TODO:
 // insert optional chaining
 // support negative index to avoid handling .at(-1) fn call
 // hasKey?
-// typeOf
+// typeof (string, boolean, number, function, object, array)
+// date ranges?
 // array intersect? (list in list)
