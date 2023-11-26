@@ -8,7 +8,7 @@ const cleanLHS = (path, chain = false) => {
   // guard against access outside of scope
   if (path[0] == '.' || path[0] == '[') {
     // remove baddies
-    cleanPath = path.replace(/[^\w.?\[\]-]/ig, '');
+    cleanPath = path.replace(/[^$\w.?\[\]-]/ig, '');
 
     // add optional chaining
     if (chain) {
@@ -145,7 +145,8 @@ case 'last':  // backwards early break
   rhs = node[2];
 case 'only':  // early return nothing if count > 1
 */
-export function compileFilter(nodes, opts = OPTS) {
+
+function _compileFilter(nodes, opts = OPTS, useIdx = false) {
   let { expr, stmts } = compileExpr(nodes, opts);
 
   return new Function(`
@@ -154,12 +155,85 @@ export function compileFilter(nodes, opts = OPTS) {
       let out = [];
       for (let $i = 0; $i < arr.length; $i++) {
         let $ = arr[$i];
-        ${expr} && out.push($);
+        ${expr} && out.push(${useIdx ? '$i' : '$'});
       }
       return out;
     };
   `)();
 }
+
+const EMPTY_ARR = [];
+
+// objs struct should be like {"prop": [1,2,3,4], "other": ['a','b','c']}
+export function compileExprCols(nodes, names = EMPTY_ARR, opts = OPTS) {
+  let { expr, stmts } = compileExpr(nodes, opts);
+
+  if (names.length > 0) {
+    names.forEach((name, i) => {
+      if (!/[^\w.]/.test(name)) {
+        expr = expr.replaceAll(name, `[${i}][$i]`);
+      }
+    });
+  }
+
+  return { expr, stmts };
+}
+
+export function compileMatcherCols(nodes, names, opts = OPTS) {
+  let { expr, stmts } = compileExprCols(nodes, names, opts);
+
+  return new Function(`
+    ${stmts.join('\n')};
+    return ($, $i = 0) => ${expr};
+  `)();
+}
+
+const filterColsIdxsBody = expr => `
+      let len = cols[0].length;
+
+      let $ = cols;
+      let idxs = [];
+
+      for (let $i = 0; $i < len; $i++) {
+        ${expr} && idxs.push($i);
+      }
+`;
+
+export function compileFilterColsIdxs(nodes, names, opts = OPTS) {
+  let { expr, stmts } = compileExprCols(nodes, names, opts);
+
+  return new Function(`
+    ${stmts.join('\n')}
+    return cols => {
+      ${filterColsIdxsBody(expr)}
+      return idxs;
+    };
+  `)();
+}
+
+export function compileFilterCols(nodes, names, opts = OPTS) {
+  let { expr, stmts } = compileExprCols(nodes, names, opts);
+
+  return new Function(`
+    ${stmts.join('\n')}
+    return cols => {
+      ${filterColsIdxsBody(expr)}
+
+      return cols.map(col => {
+        let fcol = [];
+
+        for (let i = 0; i < idxs.length; i++) {
+          fcol.push(col[idxs[i]]);
+        }
+
+        return fcol;
+      });
+    };
+  `)();
+}
+
+export const compileFilter = (nodes, opts = OPTS) => _compileFilter(nodes, opts);
+export const compileFilterIdxs = (nodes, opts = OPTS) => _compileFilter(nodes, opts, true);
 
 // TODO:
 // insert optional chaining

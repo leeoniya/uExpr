@@ -1,6 +1,16 @@
 import { test } from "node:test";
 import { strict as assert } from 'assert';
-import { compileExpr, compileMatcher, compileFilter } from "../src/uExpr.mjs";
+import {
+  compileExpr,
+  compileMatcher,
+  compileFilter,
+  compileFilterIdxs,
+
+  compileExprCols,
+  compileMatcherCols,
+  compileFilterCols,
+  compileFilterColsIdxs
+} from "../src/uExpr.mjs";
 
 test("compileExpr (single)", async t => {
   await t.test('comparators', t => {
@@ -177,6 +187,168 @@ test("compileFilter", () => {
 
   let out = filter([1,2,3,35,2,700]);
   assert.deepEqual(out, [35, 700]);
+});
+
+test("compileFilterIdxs", () => {
+  let filter = compileFilterIdxs(['>=', '$', 35]);
+  assert.deepEqual(filter.toString(), 'arr => {\n      let out = [];\n      for (let $i = 0; $i < arr.length; $i++) {\n        let $ = arr[$i];\n        $ >= 35 && out.push($i);\n      }\n      return out;\n    }');
+
+  let out = filter([1,2,3,35,2,700]);
+  assert.deepEqual(out, [3, 5]);
+});
+
+test("compileExprCols", () => {
+  assert.deepEqual(
+    compileExprCols(
+      ['&&',
+        ['==', '[0][$i]', 'a'],
+        ['>', '[1][$i]', 30],
+      ],
+    ),
+    { stmts: [], expr: '($[0][$i] == "a" && $[1][$i] > 30)' }
+  );
+});
+
+test("compileExprCols (with names)", () => {
+  assert.deepEqual(
+    compileExprCols(
+      ['&&',
+        ['==', '.name', 'a'],
+        ['>', '.value', 30],
+      ],
+      ['.name', '.value']
+    ),
+    { stmts: [], expr: '($[0][$i] == "a" && $[1][$i] > 30)' }
+  );
+});
+
+test("compileMatcherCols", () => {
+  let matcher = compileMatcherCols(
+    ['&&',
+      ['==', '[0][$i]', 'a'],
+      ['>', '[1][$i]', 30],
+    ],
+  );
+  assert.deepEqual(matcher.toString(), '($, $i = 0) => ($[0][$i] == "a" && $[1][$i] > 30)');
+
+  let out = [];
+  let cols = [
+    ['a', 'b', 'a'],
+    [0, 70, 50],
+  ];
+
+  for (let i = 0; i < cols[0].length; i++) {
+    if (matcher(cols, i)) {
+      out.push(i);
+    }
+  }
+
+  assert.deepEqual(out, [2]);
+});
+
+test("compileMatcherCols (with names)", () => {
+  let matcher = compileMatcherCols(
+    ['&&',
+      ['==', '.name', 'a'],
+      ['>', '.value', 30],
+    ],
+    ['.name', '.value']
+  );
+  assert.deepEqual(matcher.toString(), '($, $i = 0) => ($[0][$i] == "a" && $[1][$i] > 30)');
+
+  let out = [];
+  let cols = [
+    ['a', 'b', 'a'],
+    [0, 70, 50],
+  ];
+
+  for (let i = 0; i < cols[0].length; i++) {
+    if (matcher(cols, i)) {
+      out.push(i);
+    }
+  }
+
+  assert.deepEqual(out, [2]);
+});
+
+test("compileFilterCols", () => {
+  let filter = compileFilterCols(
+    ['&&',
+      ['==', '[0][$i]', 'a'],
+      ['>', '[1][$i]', 30],
+    ],
+  );
+
+  assert.deepEqual(filter.toString(), 'cols => {\n      \n      let len = cols[0].length;\n\n      let $ = cols;\n      let idxs = [];\n\n      for (let $i = 0; $i < len; $i++) {\n        ($[0][$i] == "a" && $[1][$i] > 30) && idxs.push($i);\n      }\n\n\n      return cols.map(col => {\n        let fcol = [];\n\n        for (let i = 0; i < idxs.length; i++) {\n          fcol.push(col[idxs[i]]);\n        }\n\n        return fcol;\n      });\n    }');
+
+  let out = filter([
+    ['a', 'b', 'a'],
+    [0, 70, 50],
+  ]);
+
+  assert.deepEqual(out, [
+    ['a'],
+    [50],
+  ]);
+});
+
+test("compileFilterCols (with names)", () => {
+  let filter = compileFilterCols(
+    ['&&',
+      ['==', '.name', 'a'],
+      ['>', '.value', 30],
+    ],
+    ['.name', '.value']
+  );
+
+  assert.deepEqual(filter.toString(), 'cols => {\n      \n      let len = cols[0].length;\n\n      let $ = cols;\n      let idxs = [];\n\n      for (let $i = 0; $i < len; $i++) {\n        ($[0][$i] == "a" && $[1][$i] > 30) && idxs.push($i);\n      }\n\n\n      return cols.map(col => {\n        let fcol = [];\n\n        for (let i = 0; i < idxs.length; i++) {\n          fcol.push(col[idxs[i]]);\n        }\n\n        return fcol;\n      });\n    }');
+
+  let out = filter([
+    ['a', 'b', 'a'],
+    [0, 70, 50],
+  ]);
+
+  assert.deepEqual(out, [
+    ['a'],
+    [50],
+  ]);
+});
+
+test("compileFilterColsIdxs", () => {
+  let filter = compileFilterColsIdxs(
+    ['&&',
+      ['==', '[0][$i]', 'a'],
+      ['>', '[1][$i]', 30],
+    ],
+  );
+
+  assert.deepEqual(filter.toString(), 'cols => {\n      \n      let len = cols[0].length;\n\n      let $ = cols;\n      let idxs = [];\n\n      for (let $i = 0; $i < len; $i++) {\n        ($[0][$i] == "a" && $[1][$i] > 30) && idxs.push($i);\n      }\n\n      return idxs;\n    }');
+
+  let out = filter([
+    ['a', 'b', 'a'],
+    [0, 70, 50],
+  ]);
+
+  assert.deepEqual(out, [2]);
+});
+
+test("compileFilterColsIdxs (with names)", () => {
+  let filter = compileFilterColsIdxs(
+    ['&&',
+      ['==', '.name', 'a'],
+      ['>', '.value', 30],
+    ],
+    ['.name', '.value']
+  );
+
+  assert.deepEqual(filter.toString(), 'cols => {\n      \n      let len = cols[0].length;\n\n      let $ = cols;\n      let idxs = [];\n\n      for (let $i = 0; $i < len; $i++) {\n        ($[0][$i] == "a" && $[1][$i] > 30) && idxs.push($i);\n      }\n\n      return idxs;\n    }');
+
+  let out = filter([
+    ['a', 'b', 'a'],
+    [0, 70, 50],
+  ]);
+
+  assert.deepEqual(out, [2]);
 });
 
 /*

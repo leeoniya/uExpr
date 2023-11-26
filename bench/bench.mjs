@@ -42,7 +42,9 @@ rules = (
   ]
 );
 
+console.time('uExpr (matcher init)');
 let matcher = compileMatcher(rules);
+console.timeEnd('uExpr (matcher init)');
 
 console.time('uExpr (matcher)');
 out = data.filter(matcher);
