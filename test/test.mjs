@@ -351,6 +351,30 @@ test("compileFilterColsIdxs (with names)", () => {
   assert.deepEqual(out, [2]);
 });
 
+test("compileMatcher (custom ops)", () => {
+  let ops = {
+    byName: ($, $i, $cfg) => $.name === $cfg.name,
+  };
+
+  let matcher = compileMatcher(
+    ['byName', { name: 'abc' }],
+    { ops }
+  );
+  assert.deepEqual(matcher.toString(), '($, $i = 0) => $ops.byName($, $i, $args)');
+
+  let out = matcher({name: 'abc'});
+  assert.strictEqual(out, true);
+
+  let out2 = matcher({name: 'def'});
+  assert.strictEqual(out2, false);
+
+  let matcher2 = compileMatcher(
+    ['!byName', { name: 'abc' }],
+    { ops }
+  );
+  assert.deepEqual(matcher2.toString(), '($, $i = 0) => !($ops.byName($, $i, $args))');
+});
+
 /*
 console.log(compileExpr(
   ['||',

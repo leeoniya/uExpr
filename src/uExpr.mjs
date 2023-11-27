@@ -21,7 +21,10 @@ const cleanLHS = (path, chain = false) => {
   return '$' + cleanPath;
 }
 
-let OPTS = { chain: false };
+const EMPTY_ARR = [];
+const EMPTY_OBJ = {};
+
+let OPTS = { chain: false, ops: EMPTY_OBJ };
 
 export function compileExpr(node, opts = OPTS, stmts = []) {
   let op = node[0];
@@ -34,89 +37,97 @@ export function compileExpr(node, opts = OPTS, stmts = []) {
 
   op = negate ? op.slice(1) : op;
 
-  let path = op != '&&' && op != '||' ? cleanLHS(lhs, opts.chain) : '';
+  let $ops = opts.ops ?? EMPTY_OBJ;
 
-  switch (op) {
-    case '&&':
-    case '||':
-      let exprs = node.slice(1).map(node2 => compileExpr(node2, opts, stmts));
-      expr = exprs.length > 1 ? `(${exprs.map(o => o.expr).join(` ${op} `)})` : exprs[0].expr;
-      break;
+  if (typeof $ops[op] == 'function' && /^\w+$/.test(op)) {
+    stmts.push(`let $args = ${JSON.stringify(lhs ?? null)};`);
+    expr = `$ops.${op}($, $i, $args)`;
+  }
+  else {
+    let path = op != '&&' && op != '||' ? cleanLHS(lhs, opts.chain) : '';
 
-    case 'truthy':
-    case '!!':
-      expr = `Boolean(${path})`;
-      break;
+    switch (op) {
+      case '&&':
+      case '||':
+        let exprs = node.slice(1).map(node2 => compileExpr(node2, opts, stmts));
+        expr = exprs.length > 1 ? `(${exprs.map(o => o.expr).join(` ${op} `)})` : exprs[0].expr;
+        break;
 
-    case '==':
-    case '!=':
-    case '===':
-    case '!==':
-    case '>=':
-    case '<=':
-    case '<':
-    case '>':
-      expr = `${path} ${op} ${cleanRHS(rhs)}`;
-      break;
+      case 'truthy':
+      case '!!':
+        expr = `Boolean(${path})`;
+        break;
 
-    case 'some':
-    case 'every':
-      expr = `${path}.${op}(($, $i) => ${compileExpr(rhs, opts, stmts).expr})`;
-      break;
+      case '==':
+      case '!=':
+      case '===':
+      case '!==':
+      case '>=':
+      case '<=':
+      case '<':
+      case '>':
+        expr = `${path} ${op} ${cleanRHS(rhs)}`;
+        break;
 
-    case ',':
-    case 'in':
-      expr = `$${stmts.length}.has(${path})`;
-      stmts.push(`let $${stmts.length} = new Set(${cleanRHS(rhs)});`);
-      break;
+      case 'some':
+      case 'every':
+        expr = `${path}.${op}(($, $i) => ${compileExpr(rhs, opts, stmts).expr})`;
+        break;
 
-    case '-':
-    case '[]':
-    case '()':
-    case '[)':
-    case '(]':
-      if (!Array.isArray(rhs)) break;
+      case ',':
+      case 'in':
+        expr = `$${stmts.length}.has(${path})`;
+        stmts.push(`let $${stmts.length} = new Set(${cleanRHS(rhs)});`);
+        break;
 
-      let [min, max] = rhs;
-      let [l, r] = op;
-      let lop = l == '[' || l == '-' ? '>=' : '>';
-      let rop = r == ']' || r == null ? '<=' : '<';
-      expr = `${path} ${lop} ${cleanRHS(min)} && ${path} ${rop} ${cleanRHS(max)}`;
-      break;
+      case '-':
+      case '[]':
+      case '()':
+      case '[)':
+      case '(]':
+        if (!Array.isArray(rhs)) break;
 
-    case 'startsWith':
-    case '^':
-      expr = `${path}.startsWith(${cleanRHS(rhs)})`;
-      break;
+        let [min, max] = rhs;
+        let [l, r] = op;
+        let lop = l == '[' || l == '-' ? '>=' : '>';
+        let rop = r == ']' || r == null ? '<=' : '<';
+        expr = `${path} ${lop} ${cleanRHS(min)} && ${path} ${rop} ${cleanRHS(max)}`;
+        break;
 
-    case 'endsWith':
-    case '$':
-      expr = `${path}.endsWith(${cleanRHS(rhs)})`;
-      break;
+      case 'startsWith':
+      case '^':
+        expr = `${path}.startsWith(${cleanRHS(rhs)})`;
+        break;
 
-    case 'includes':
-    case '*':
-      expr = `${path}.includes(${cleanRHS(rhs)})`;
-      break;
+      case 'endsWith':
+      case '$':
+        expr = `${path}.endsWith(${cleanRHS(rhs)})`;
+        break;
 
-    case 'regexp':
-    case 'regexpi':
-    case '/':
-    case '/i':
-      let flags = op.at(-1) == 'i' ? 'i' : '';
-      expr = `$${stmts.length}.test(${path})`;
-      stmts.push(`let $${stmts.length} = new RegExp(${cleanRHS(rhs)}, "${flags}");`);
-      break;
+      case 'includes':
+      case '*':
+        expr = `${path}.includes(${cleanRHS(rhs)})`;
+        break;
 
-    case 'isInteger':
-    case 'isFinite':
-    case 'isNaN':
-      expr = `Number.${op}(${path})`;
-      break;
+      case 'regexp':
+      case 'regexpi':
+      case '/':
+      case '/i':
+        let flags = op.at(-1) == 'i' ? 'i' : '';
+        expr = `$${stmts.length}.test(${path})`;
+        stmts.push(`let $${stmts.length} = new RegExp(${cleanRHS(rhs)}, "${flags}");`);
+        break;
 
-    case 'isArray':
-      expr = `Array.isArray(${path})`;
-      break;
+      case 'isInteger':
+      case 'isFinite':
+      case 'isNaN':
+        expr = `Number.${op}(${path})`;
+        break;
+
+      case 'isArray':
+        expr = `Array.isArray(${path})`;
+        break;
+    }
   }
 
   expr = negate ? `!(${expr})` : expr;
@@ -130,10 +141,10 @@ export function compileExpr(node, opts = OPTS, stmts = []) {
 export function compileMatcher(nodes, opts = OPTS) {
   let { expr, stmts } = compileExpr(nodes, opts);
 
-  return new Function(`
+  return new Function('$ops', `
     ${stmts.join('\n')};
     return ($, $i = 0) => ${expr};
-  `)();
+  `)(opts.ops ?? EMPTY_OBJ);
 }
 
 /*
@@ -149,7 +160,7 @@ case 'only':  // early return nothing if count > 1
 function _compileFilter(nodes, opts = OPTS, useIdx = false) {
   let { expr, stmts } = compileExpr(nodes, opts);
 
-  return new Function(`
+  return new Function('$ops', `
     ${stmts.join('\n')}
     return arr => {
       let out = [];
@@ -159,10 +170,8 @@ function _compileFilter(nodes, opts = OPTS, useIdx = false) {
       }
       return out;
     };
-  `)();
+  `)(opts.ops ?? EMPTY_OBJ);
 }
-
-const EMPTY_ARR = [];
 
 // objs struct should be like {"prop": [1,2,3,4], "other": ['a','b','c']}
 export function compileExprCols(nodes, names = EMPTY_ARR, opts = OPTS) {
@@ -182,10 +191,10 @@ export function compileExprCols(nodes, names = EMPTY_ARR, opts = OPTS) {
 export function compileMatcherCols(nodes, names, opts = OPTS) {
   let { expr, stmts } = compileExprCols(nodes, names, opts);
 
-  return new Function(`
+  return new Function('$ops', `
     ${stmts.join('\n')};
     return ($, $i = 0) => ${expr};
-  `)();
+  `)(opts.ops ?? EMPTY_OBJ);
 }
 
 const filterColsIdxsBody = expr => `
@@ -202,19 +211,19 @@ const filterColsIdxsBody = expr => `
 export function compileFilterColsIdxs(nodes, names, opts = OPTS) {
   let { expr, stmts } = compileExprCols(nodes, names, opts);
 
-  return new Function(`
+  return new Function('$ops', `
     ${stmts.join('\n')}
     return cols => {
       ${filterColsIdxsBody(expr)}
       return idxs;
     };
-  `)();
+  `)(opts.ops ?? EMPTY_OBJ);
 }
 
 export function compileFilterCols(nodes, names, opts = OPTS) {
   let { expr, stmts } = compileExprCols(nodes, names, opts);
 
-  return new Function(`
+  return new Function('$ops', `
     ${stmts.join('\n')}
     return cols => {
       ${filterColsIdxsBody(expr)}
@@ -229,7 +238,7 @@ export function compileFilterCols(nodes, names, opts = OPTS) {
         return fcol;
       });
     };
-  `)();
+  `)(opts.ops ?? EMPTY_OBJ);
 }
 
 export const compileFilter = (nodes, opts = OPTS) => _compileFilter(nodes, opts);
