@@ -33,7 +33,7 @@ export function compileExpr(node, opts = OPTS, stmts = []) {
 
   let expr = '';
 
-  let negate = op[0] == '!' && op != '!=' && op != '!==' && op !== '!!';
+  let negate = op[0] == '!' && op != '!=' && op != '!==' && op != '!!' && op != '!';
 
   op = negate ? op.slice(1) : op;
 
@@ -56,6 +56,10 @@ export function compileExpr(node, opts = OPTS, stmts = []) {
       case 'truthy':
       case '!!':
         expr = `Boolean(${path})`;
+        break;
+      case 'falsy':
+      case '!':
+        expr = `!Boolean(${path})`;
         break;
 
       case '==':

@@ -37,6 +37,15 @@ test("compileExpr (single)", async t => {
     });
   });
 
+  await t.test("falsy", t => {
+    [
+      '!',
+      'falsy',
+    ].forEach(op => {
+      assert.deepEqual(compileExpr([op, '.a']), { stmts: [], expr: `!Boolean($.a)` });
+    });
+  });
+
   await t.test("list contains", t => {
     [
       'some',
@@ -111,6 +120,10 @@ test("compileExpr (single)", async t => {
 test("compileExpr (single, inversion)", async t => {
   await t.test("!truthy", t => {
     assert.deepEqual(compileExpr(['!truthy', '.a']), { stmts: [], expr: `!(Boolean($.a))` });
+  });
+
+  await t.test("!falsy", t => {
+    assert.deepEqual(compileExpr(['!falsy', '.a']), { stmts: [], expr: `!(!Boolean($.a))` });
   });
 
   await t.test("!list contains", t => {
