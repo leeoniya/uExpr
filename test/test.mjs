@@ -196,7 +196,7 @@ test("compileMatcher", () => {
 
 test("compileFilter", () => {
   let filter = compileFilter(['>=', '$', 35]);
-  assert.deepEqual(filter.toString(), 'arr => {\n      let out = [];\n      for (let $i = 0; $i < arr.length; $i++) {\n        let $ = arr[$i];\n        $ >= 35 && out.push($);\n      }\n      return out;\n    }');
+  assert.deepEqual(filter.toString(), 'arr => {\n      let out = [];\n      for (let i = 0; i < arr.length; i++) {\n        let $i = i, $ = arr[i];\n        $ >= 35 && out.push($);\n      }\n      return out;\n    }');
 
   let out = filter([1,2,3,35,2,700]);
   assert.deepEqual(out, [35, 700]);
@@ -204,7 +204,7 @@ test("compileFilter", () => {
 
 test("compileFilterIdxs", () => {
   let filter = compileFilterIdxs(['>=', '$', 35]);
-  assert.deepEqual(filter.toString(), 'arr => {\n      let out = [];\n      for (let $i = 0; $i < arr.length; $i++) {\n        let $ = arr[$i];\n        $ >= 35 && out.push($i);\n      }\n      return out;\n    }');
+  assert.deepEqual(filter.toString(), 'arr => {\n      let out = [];\n      for (let i = 0; i < arr.length; i++) {\n        let $i = i, $ = arr[i];\n        $ >= 35 && out.push($i);\n      }\n      return out;\n    }');
 
   let out = filter([1,2,3,35,2,700]);
   assert.deepEqual(out, [3, 5]);

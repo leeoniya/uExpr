@@ -24,7 +24,7 @@ const cleanLHS = (path, chain = false) => {
 const EMPTY_ARR = [];
 const EMPTY_OBJ = {};
 
-let OPTS = { chain: false, ops: EMPTY_OBJ };
+let OPTS = { chain: false, ops: EMPTY_OBJ, get: null };
 
 export function compileExpr(node, opts = OPTS, stmts = []) {
   let op = node[0];
@@ -144,11 +144,18 @@ export function compileExpr(node, opts = OPTS, stmts = []) {
 
 export function compileMatcher(nodes, opts = OPTS) {
   let { expr, stmts } = compileExpr(nodes, opts);
+  return _compileMatcher(expr, stmts, opts);
+}
 
-  return new Function('$ops', `
+function _compileMatcher(expr, stmts, opts = OPTS) {
+  let { get } = opts;
+
+  let argsTpl = get == null ? '($, $i = 0)' : '($i, _i, _a, $ = $get($i))';
+
+  return new Function('$ops', '$get', `
     ${stmts.join('\n')};
-    return ($, $i = 0) => ${expr};
-  `)(opts.ops ?? EMPTY_OBJ);
+    return ${argsTpl} => ${expr};
+  `)(opts.ops ?? EMPTY_OBJ, get);
 }
 
 /*
@@ -163,18 +170,22 @@ case 'only':  // early return nothing if count > 1
 
 function _compileFilter(nodes, opts = OPTS, useIdx = false) {
   let { expr, stmts } = compileExpr(nodes, opts);
+  let { get } = opts;
 
-  return new Function('$ops', `
+  let $itpl = get == null ? 'i' : 'arr[i]';
+  let $tpl  = get == null ? 'arr[i]' : '$get($i)';
+
+  return new Function('$ops', '$get', `
     ${stmts.join('\n')}
     return arr => {
       let out = [];
-      for (let $i = 0; $i < arr.length; $i++) {
-        let $ = arr[$i];
+      for (let i = 0; i < arr.length; i++) {
+        let $i = ${$itpl}, $ = ${$tpl};
         ${expr} && out.push(${useIdx ? '$i' : '$'});
       }
       return out;
     };
-  `)(opts.ops ?? EMPTY_OBJ);
+  `)(opts.ops ?? EMPTY_OBJ, get);
 }
 
 // objs struct should be like {"prop": [1,2,3,4], "other": ['a','b','c']}
@@ -194,14 +205,19 @@ export function compileExprCols(nodes, names = EMPTY_ARR, opts = OPTS) {
 
 export function compileMatcherCols(nodes, names, opts = OPTS) {
   let { expr, stmts } = compileExprCols(nodes, names, opts);
-
-  return new Function('$ops', `
-    ${stmts.join('\n')};
-    return ($, $i = 0) => ${expr};
-  `)(opts.ops ?? EMPTY_OBJ);
+  return _compileMatcher(expr, stmts, opts);
 }
 
-const filterColsIdxsBody = expr => `
+function _compileFilterCols(nodes, names, opts = OPTS, useIdx = false) {
+  let { expr, stmts } = compileExprCols(nodes, names, opts);
+  let { get } = opts;
+
+  // let $itpl = get == null ? 'i' : 'arr[i]';
+  // let $tpl  = get == null ? 'arr[i]' : '$get($i)';
+
+  return new Function('$ops', '$get', `
+    ${stmts.join('\n')}
+    return cols => {
       let len = cols[0].length;
 
       let $ = cols;
@@ -210,29 +226,8 @@ const filterColsIdxsBody = expr => `
       for (let $i = 0; $i < len; $i++) {
         ${expr} && idxs.push($i);
       }
-`;
 
-export function compileFilterColsIdxs(nodes, names, opts = OPTS) {
-  let { expr, stmts } = compileExprCols(nodes, names, opts);
-
-  return new Function('$ops', `
-    ${stmts.join('\n')}
-    return cols => {
-      ${filterColsIdxsBody(expr)}
-      return idxs;
-    };
-  `)(opts.ops ?? EMPTY_OBJ);
-}
-
-export function compileFilterCols(nodes, names, opts = OPTS) {
-  let { expr, stmts } = compileExprCols(nodes, names, opts);
-
-  return new Function('$ops', `
-    ${stmts.join('\n')}
-    return cols => {
-      ${filterColsIdxsBody(expr)}
-
-      return cols.map(col => {
+      return ${useIdx ? `idxs` : `cols.map(col => {
         let fcol = [];
 
         for (let i = 0; i < idxs.length; i++) {
@@ -240,13 +235,15 @@ export function compileFilterCols(nodes, names, opts = OPTS) {
         }
 
         return fcol;
-      });
+      })`};
     };
-  `)(opts.ops ?? EMPTY_OBJ);
+  `)(opts.ops ?? EMPTY_OBJ, get);
 }
 
 export const compileFilter = (nodes, opts = OPTS) => _compileFilter(nodes, opts);
 export const compileFilterIdxs = (nodes, opts = OPTS) => _compileFilter(nodes, opts, true);
+export const compileFilterCols = (nodes, names, opts = OPTS) => _compileFilterCols(nodes, names, opts);
+export const compileFilterColsIdxs = (nodes, names, opts = OPTS) => _compileFilterCols(nodes, names, opts, true);
 
 // TODO:
 // insert optional chaining
@@ -255,3 +252,6 @@ export const compileFilterIdxs = (nodes, opts = OPTS) => _compileFilter(nodes, o
 // typeof (string, boolean, number, function, object, array)
 // date ranges?
 // array intersect? (list in list)
+
+// export const compileIndexMatcher = (nodes, opts = OPTS)
+// export const compileIndexFilter = (nodes, opts = OPTS)

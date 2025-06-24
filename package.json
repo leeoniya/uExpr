@@ -12,6 +12,6 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "json-logic-js": "^2.0.2"
+    "json-logic-js": "^2.0.5"
   }
 }

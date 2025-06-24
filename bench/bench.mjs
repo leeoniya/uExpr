@@ -7,7 +7,7 @@ function randInt(min, max) {
 
 let fillings = 'apple cherry pumpkin lemon'.split(' ');
 
-let count = 5e4;
+let count = 100_000;
 
 let data = Array(count);
 
@@ -53,10 +53,33 @@ console.timeEnd('uExpr (matcher)');
 console.log(out.length);
 
 
+console.time('uExpr (matcher/get init)');
+let matcher2 = compileMatcher(rules, { get: i => data[i] });
+console.timeEnd('uExpr (matcher/get init)');
+
+let idxs = Array(count);
+for (let i = 0; i < count; i++)
+  idxs[i] = i;
+
+console.time('uExpr (matcher/get)');
+out = idxs.filter(matcher2);
+console.timeEnd('uExpr (matcher/get)');
+
+console.log(out.length);
+
 let filter = compileFilter(rules);
 
 console.time('uExpr (filter)');
 out = filter(data);
 console.timeEnd('uExpr (filter)');
+
+console.log(out.length);
+
+
+let filter2 = compileFilter(rules, { get: i => data[i] });
+
+console.time('uExpr (filter/get)');
+out = filter2(idxs);
+console.timeEnd('uExpr (filter/get)');
 
 console.log(out.length);
