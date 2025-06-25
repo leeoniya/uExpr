@@ -1,4 +1,4 @@
-import { compileExpr, compileMatcher, compileFilter } from "../src/uExpr.mjs";
+import { compileExpr, compileMatcher, initFilter, initFilterIdxs } from "../src/uExpr.mjs";
 import jsonLogic from 'json-logic-js';
 
 function randInt(min, max) {
@@ -19,6 +19,11 @@ for (let i = 0; i < count; i++) {
     }
   };
 }
+
+let idxs = Array(count);
+
+for (let i = 0; i < count; i++)
+  idxs[i] = i;
 
 let rules = {
   "and": [
@@ -42,44 +47,37 @@ rules = (
   ]
 );
 
-console.time('uExpr (matcher init)');
-let matcher = compileMatcher(rules);
-console.timeEnd('uExpr (matcher init)');
+{
+  console.time('uExpr (matcher)');
+  let matcher = compileMatcher(rules);
+  let out = data.filter(matcher);
+  console.timeEnd('uExpr (matcher)');
+  // console.log(out.length);
+}
 
-console.time('uExpr (matcher)');
-out = data.filter(matcher);
-console.timeEnd('uExpr (matcher)');
+{
+  console.time('initFilter');
+  let filter = initFilter(rules);
+  let out = filter(data);
+  console.timeEnd('initFilter');
+  // console.log(out.length);
+}
 
-console.log(out.length);
+{
+  console.time('initFilterIdxs');
+  let filter = initFilterIdxs(rules);
+  let out = filter(data);
+  console.timeEnd('initFilterIdxs');
+  // console.log(out.length);
+}
 
+{
+  console.time('initFilterIdxs, proxy');
+  let filter = initFilterIdxs(rules);
+  let out = filter(data, idxs);
+  console.timeEnd('initFilterIdxs, proxy');
+  // console.log(out.length);
+}
 
-console.time('uExpr (matcher/get init)');
-let matcher2 = compileMatcher(rules, { get: i => data[i] });
-console.timeEnd('uExpr (matcher/get init)');
+// columns
 
-let idxs = Array(count);
-for (let i = 0; i < count; i++)
-  idxs[i] = i;
-
-console.time('uExpr (matcher/get)');
-out = idxs.filter(matcher2);
-console.timeEnd('uExpr (matcher/get)');
-
-console.log(out.length);
-
-let filter = compileFilter(rules);
-
-console.time('uExpr (filter)');
-out = filter(data);
-console.timeEnd('uExpr (filter)');
-
-console.log(out.length);
-
-
-let filter2 = compileFilter(rules, { get: i => data[i] });
-
-console.time('uExpr (filter/get)');
-out = filter2(idxs);
-console.timeEnd('uExpr (filter/get)');
-
-console.log(out.length);

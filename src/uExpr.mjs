@@ -168,24 +168,54 @@ case 'last':  // backwards early break
 case 'only':  // early return nothing if count > 1
 */
 
+const RETVALS = 0
+const RETIDXS = 1;
+const USESTOR = 2;
+
+// function _compileFilter(nodes, opts = OPTS, mode = RETVALS) {
+//   let { expr, stmts } = compileExpr(nodes, opts);
+
+//   let $i = mode == USESTOR ? 'arr[i]'  : 'i';
+//   let $  = mode == USESTOR ? 'sto[$i]' : 'arr[i]';
+//   let v  = mode == RETVALS ? '$'       : '$i';
+
+//   return new Function('$ops', `
+//     ${stmts.join('\n')}
+//     return (arr, sto) => {
+//       let out = [];
+//       for (let i = 0; i < arr.length; i++) {
+//         let $i = ${$i}, $ = ${$};
+//         ${expr} && out.push(${v});
+//       }
+//       return out;
+//     };
+//   `)(opts.ops ?? EMPTY_OBJ);
+// }
+
 function _compileFilter(nodes, opts = OPTS, useIdx = false) {
   let { expr, stmts } = compileExpr(nodes, opts);
-  let { get } = opts;
+  let v  = useIdx ? '$i' : '$';
 
-  let $itpl = get == null ? 'i' : 'arr[i]';
-  let $tpl  = get == null ? 'arr[i]' : '$get($i)';
-
-  return new Function('$ops', '$get', `
+  return new Function('$ops', `
     ${stmts.join('\n')}
-    return arr => {
+    return (arr, idxs) => {
       let out = [];
-      for (let i = 0; i < arr.length; i++) {
-        let $i = ${$itpl}, $ = ${$tpl};
-        ${expr} && out.push(${useIdx ? '$i' : '$'});
+
+      if (idxs == null) {
+        for (let i = 0; i < arr.length; i++) {
+          let $i = i, $ = arr[i];
+          ${expr} && out.push(${v});
+        }
+      } else {
+        for (let i = 0; i < idxs.length; i++) {
+          let $i = idxs[i], $ = arr[$i];
+          ${expr} && out.push(${v});
+        }
       }
+
       return out;
     };
-  `)(opts.ops ?? EMPTY_OBJ, get);
+  `)(opts.ops ?? EMPTY_OBJ);
 }
 
 // objs struct should be like {"prop": [1,2,3,4], "other": ['a','b','c']}
@@ -240,9 +270,11 @@ function _compileFilterCols(nodes, names, opts = OPTS, useIdx = false) {
   `)(opts.ops ?? EMPTY_OBJ, get);
 }
 
-export const compileFilter = (nodes, opts = OPTS) => _compileFilter(nodes, opts);
-export const compileFilterIdxs = (nodes, opts = OPTS) => _compileFilter(nodes, opts, true);
-export const compileFilterCols = (nodes, names, opts = OPTS) => _compileFilterCols(nodes, names, opts);
+export const initFilter     = (nodes, opts = OPTS) => _compileFilter(nodes, opts);
+export const initFilterIdxs = (nodes, opts = OPTS) => _compileFilter(nodes, opts, true);
+// export const initFilterStor = (nodes, opts = OPTS) => _compileFilter(nodes, opts, USESTOR);
+
+export const compileFilterCols  = (nodes, names, opts = OPTS) => _compileFilterCols(nodes, names, opts);
 export const compileFilterColsIdxs = (nodes, names, opts = OPTS) => _compileFilterCols(nodes, names, opts, true);
 
 // TODO:
