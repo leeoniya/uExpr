@@ -1,4 +1,4 @@
-import { compileExpr, compileMatcher, initFilter, initFilterIdxs } from "../src/uExpr.mjs";
+import { initMatcher, initFilter, initFilterIdxs } from "../src/uExpr.mjs";
 import jsonLogic from 'json-logic-js';
 
 function randInt(min, max) {
@@ -49,7 +49,7 @@ rules = (
 
 {
   console.time('uExpr (matcher)');
-  let matcher = compileMatcher(rules);
+  let matcher = initMatcher(rules);
   let out = data.filter(matcher);
   console.timeEnd('uExpr (matcher)');
   // console.log(out.length);

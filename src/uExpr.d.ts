@@ -14,6 +14,8 @@ export type StringOp =
   '!$'  | '!endsWith'   |
   '!/'  | '!regexp'     |
   '!/i' | '!regexpi'
+
+  // ~ | fuzzyMatch
 ;
 
 export type ArrayHasExpr = [op: ArrayHasOp, lhs: string, rhs: Expr];
@@ -79,5 +81,19 @@ export type TruthyOp =
 export type Op = CombineOp | StringOp | ArrayHasOp | InListOp | CompareOp | RangeOp | IsTypeOp | TruthyOp;
 export type Expr = CombineExpr | StringExpr | ArrayHasExpr | InListExpr | CompareExpr | RangeExpr | IsTypeExpr | TruthyExpr;
 
-export function compileFilter<T = any>(expr: Expr): (val: T[]) => T[];
-export function compileMatcher<T = any>(expr: Expr): (val: T, idx: number) => boolean;
+export type UserOp = ($: unknown, $i?: number, $args?: unknown) => boolean;
+
+export interface InitOpts {
+  /** auto-add optional chaining */
+  chain?: boolean;
+  /** user-defined custom ops */
+  ops?: Record<string, UserOp>;
+}
+
+export function initMatcher        <TItem = any>(expr: Expr, opts?: InitOpts): (item: TItem, idx: number) => boolean;
+export function initFilter         <TItem = any>(expr: Expr, opts?: InitOpts): (items: TItem[], idxs?: number[]) => TItem[];
+export function initFilterIdxs     <TItem = any>(expr: Expr, opts?: InitOpts): (items: TItem[], idxs?: number[]) => number[];
+
+export function initMatcherCols    <TCols = any>(expr: Expr, names?: string[], opts?: InitOpts): (cols: TCols, idx: number) => boolean;
+export function initFilterCols     <TCols = any>(expr: Expr, names?: string[], opts?: InitOpts): (cols: TCols, idxs?: number[]) => TCols;
+export function initFilterColsIdxs <TCols = any>(expr: Expr, names?: string[], opts?: InitOpts): (cols: TCols, idxs?: number[]) => number[];

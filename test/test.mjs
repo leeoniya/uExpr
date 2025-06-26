@@ -2,13 +2,13 @@ import { test } from "node:test";
 import { strict as assert } from 'assert';
 import {
   compileExpr,
-  compileMatcher,
+  compileExprCols,
+
+  initMatcher,
+  initMatcherCols,
 
   initFilter,
   initFilterIdxs,
-
-  compileExprCols,
-  compileMatcherCols,
 
   initFilterCols,
   initFilterColsIdxs
@@ -190,8 +190,8 @@ test("compileExpr (compound)", () => {
   );
 });
 
-test("compileMatcher", () => {
-  let matcher = compileMatcher(['>=', '$', 35]);
+test("initMatcher", () => {
+  let matcher = initMatcher(['>=', '$', 35]);
   assert.deepEqual(getFnString(matcher), '($, $i = 0) => $ >= 35');
 
   let out = [1,2,3,35,2,700].filter(matcher);
@@ -239,8 +239,8 @@ test("compileExprCols (with names)", () => {
   );
 });
 
-test("compileMatcherCols", () => {
-  let matcher = compileMatcherCols(
+test("initMatcherCols", () => {
+  let matcher = initMatcherCols(
     ['&&',
       ['==', '[0]', 'a'],
       ['>', '[1]', 30],
@@ -263,8 +263,8 @@ test("compileMatcherCols", () => {
   assert.deepEqual(out, [2]);
 });
 
-test("compileMatcherCols (with names)", () => {
-  let matcher = compileMatcherCols(
+test("initMatcherCols (with names)", () => {
+  let matcher = initMatcherCols(
     ['&&',
       ['==', '.name', 'a'],
       ['>', '.value', 30],
@@ -368,12 +368,12 @@ test("initFilterColsIdxs (with names)", () => {
   assert.deepEqual(out, [2]);
 });
 
-test("compileMatcher (custom ops)", () => {
+test("initMatcher (custom ops)", () => {
   let ops = {
     byName: ($, $i, $cfg) => $.name === $cfg.name,
   };
 
-  let matcher = compileMatcher(
+  let matcher = initMatcher(
     ['byName', { name: 'abc' }],
     { ops }
   );
@@ -385,7 +385,7 @@ test("compileMatcher (custom ops)", () => {
   let out2 = matcher({name: 'def'});
   assert.strictEqual(out2, false);
 
-  let matcher2 = compileMatcher(
+  let matcher2 = initMatcher(
     ['!byName', { name: 'abc' }],
     { ops }
   );

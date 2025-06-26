@@ -24,7 +24,7 @@ const cleanLHS = (path, chain = false) => {
 const EMPTY_ARR = [];
 const EMPTY_OBJ = {};
 
-let OPTS = { chain: false, ops: EMPTY_OBJ, get: null };
+let OPTS = { chain: false, ops: EMPTY_OBJ };
 
 export function compileExpr(node, opts = OPTS, stmts = []) {
   let op = node[0];
@@ -142,13 +142,8 @@ export function compileExpr(node, opts = OPTS, stmts = []) {
   };
 }
 
-export function compileMatcher(nodes, opts = OPTS) {
-  let { expr, stmts } = compileExpr(nodes, opts);
-  return _compileMatcher(expr, stmts, opts);
-}
-
 function _compileMatcher(expr, stmts, opts = OPTS) {
-  return new Function('$ops', '$get', `
+  return new Function('$ops', `
     ${stmts.join('\n')};
     return ($, $i = 0) => ${expr};
   `)(opts.ops ?? EMPTY_OBJ);
@@ -207,11 +202,6 @@ export function compileExprCols(nodes, names = EMPTY_ARR, opts = OPTS) {
   return { expr, stmts };
 }
 
-export function compileMatcherCols(nodes, names, opts = OPTS) {
-  let { expr, stmts } = compileExprCols(nodes, names, opts);
-  return _compileMatcher(expr, stmts, opts);
-}
-
 function _compileFilterCols(nodes, names, opts = OPTS, useIdx = false) {
   let { expr, stmts } = compileExprCols(nodes, names, opts);
 
@@ -247,6 +237,8 @@ function _compileFilterCols(nodes, names, opts = OPTS, useIdx = false) {
   `)(opts.ops ?? EMPTY_OBJ);
 }
 
+export const initMatcher        = (nodes, opts = OPTS,        { expr, stmts } = compileExpr(nodes, opts))            => _compileMatcher(expr, stmts, opts);
+export const initMatcherCols    = (nodes, names, opts = OPTS, { expr, stmts } = compileExprCols(nodes, names, opts)) => _compileMatcher(expr, stmts, opts);
 export const initFilter         = (nodes, opts = OPTS)        => _compileFilter(nodes, opts);
 export const initFilterIdxs     = (nodes, opts = OPTS)        => _compileFilter(nodes, opts, true);
 export const initFilterCols     = (nodes, names, opts = OPTS) => _compileFilterCols(nodes, names, opts);
