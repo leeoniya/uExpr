@@ -148,14 +148,10 @@ export function compileMatcher(nodes, opts = OPTS) {
 }
 
 function _compileMatcher(expr, stmts, opts = OPTS) {
-  let { get } = opts;
-
-  let argsTpl = get == null ? '($, $i = 0)' : '($i, _i, _a, $ = $get($i))';
-
   return new Function('$ops', '$get', `
     ${stmts.join('\n')};
-    return ${argsTpl} => ${expr};
-  `)(opts.ops ?? EMPTY_OBJ, get);
+    return ($, $i = 0) => ${expr};
+  `)(opts.ops ?? EMPTY_OBJ);
 }
 
 /*
@@ -167,30 +163,6 @@ case 'last':  // backwards early break
   rhs = node[2];
 case 'only':  // early return nothing if count > 1
 */
-
-const RETVALS = 0
-const RETIDXS = 1;
-const USESTOR = 2;
-
-// function _compileFilter(nodes, opts = OPTS, mode = RETVALS) {
-//   let { expr, stmts } = compileExpr(nodes, opts);
-
-//   let $i = mode == USESTOR ? 'arr[i]'  : 'i';
-//   let $  = mode == USESTOR ? 'sto[$i]' : 'arr[i]';
-//   let v  = mode == RETVALS ? '$'       : '$i';
-
-//   return new Function('$ops', `
-//     ${stmts.join('\n')}
-//     return (arr, sto) => {
-//       let out = [];
-//       for (let i = 0; i < arr.length; i++) {
-//         let $i = ${$i}, $ = ${$};
-//         ${expr} && out.push(${v});
-//       }
-//       return out;
-//     };
-//   `)(opts.ops ?? EMPTY_OBJ);
-// }
 
 function _compileFilter(nodes, opts = OPTS, useIdx = false) {
   let { expr, stmts } = compileExpr(nodes, opts);
@@ -225,10 +197,12 @@ export function compileExprCols(nodes, names = EMPTY_ARR, opts = OPTS) {
   if (names.length > 0) {
     names.forEach((name, i) => {
       if (!/[^\w.]/.test(name)) {
-        expr = expr.replaceAll(name, `[${i}][$i]`);
+        expr = expr.replaceAll(name, `[${i}]`);
       }
     });
   }
+
+  expr = expr.replace(/\[\d+\]/g, `$&[$i]`);
 
   return { expr, stmts };
 }
@@ -240,42 +214,43 @@ export function compileMatcherCols(nodes, names, opts = OPTS) {
 
 function _compileFilterCols(nodes, names, opts = OPTS, useIdx = false) {
   let { expr, stmts } = compileExprCols(nodes, names, opts);
-  let { get } = opts;
 
-  // let $itpl = get == null ? 'i' : 'arr[i]';
-  // let $tpl  = get == null ? 'arr[i]' : '$get($i)';
-
-  return new Function('$ops', '$get', `
+  return new Function('$ops', `
     ${stmts.join('\n')}
-    return cols => {
-      let len = cols[0].length;
+    return (cols, idxs) => {
+      let len = idxs == null ? cols[0].length : idxs.length;
 
       let $ = cols;
-      let idxs = [];
+      let _idxs = [];
 
-      for (let $i = 0; $i < len; $i++) {
-        ${expr} && idxs.push($i);
+      if (idxs != null) {
+        for (let i = 0; i < len; i++) {
+          let $i = idxs[i];
+          ${expr} && _idxs.push($i);
+        }
+      } else {
+        for (let $i = 0; $i < len; $i++) {
+          ${expr} && _idxs.push($i);
+        }
       }
 
-      return ${useIdx ? `idxs` : `cols.map(col => {
+      return ${useIdx ? `_idxs` : `cols.map(col => {
         let fcol = [];
 
-        for (let i = 0; i < idxs.length; i++) {
-          fcol.push(col[idxs[i]]);
+        for (let i = 0; i < _idxs.length; i++) {
+          fcol.push(col[_idxs[i]]);
         }
 
         return fcol;
       })`};
     };
-  `)(opts.ops ?? EMPTY_OBJ, get);
+  `)(opts.ops ?? EMPTY_OBJ);
 }
 
-export const initFilter     = (nodes, opts = OPTS) => _compileFilter(nodes, opts);
-export const initFilterIdxs = (nodes, opts = OPTS) => _compileFilter(nodes, opts, true);
-// export const initFilterStor = (nodes, opts = OPTS) => _compileFilter(nodes, opts, USESTOR);
-
-export const compileFilterCols  = (nodes, names, opts = OPTS) => _compileFilterCols(nodes, names, opts);
-export const compileFilterColsIdxs = (nodes, names, opts = OPTS) => _compileFilterCols(nodes, names, opts, true);
+export const initFilter         = (nodes, opts = OPTS)        => _compileFilter(nodes, opts);
+export const initFilterIdxs     = (nodes, opts = OPTS)        => _compileFilter(nodes, opts, true);
+export const initFilterCols     = (nodes, names, opts = OPTS) => _compileFilterCols(nodes, names, opts);
+export const initFilterColsIdxs = (nodes, names, opts = OPTS) => _compileFilterCols(nodes, names, opts, true);
 
 // TODO:
 // insert optional chaining
